@@ -6,6 +6,7 @@ from pptx.enum.shapes import MSO_SHAPE
 from PIL import Image
 import os
 import logging
+from app.utils import download_image
 
 # Configurar logging para ver los errores en la consola (y en los logs de Render)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

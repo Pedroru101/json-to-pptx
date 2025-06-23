@@ -5,8 +5,31 @@ import os
 
 def generar_pptx(data, filename):
     pr = Presentation()
-    datos = data[0]
-    imagenes = [d["url"] for d in data[1:]]
+
+    # --- INICIO DE LAS VALIDACIONES DE ENTRADA ---
+    if not isinstance(data, list) or not data:
+        raise ValueError("Input data must be a non-empty list.")
+
+    # Intentar obtener los datos del resumen global
+    try:
+        datos = data[0]
+        if not isinstance(datos, dict):
+            raise ValueError("First item in data must be a dictionary.")
+    except IndexError:
+        raise ValueError("Data list is empty for global summary.")
+
+    # Intentar obtener las URLs de las imágenes, manejando errores
+    imagenes = []
+    for d in data[1:]:
+        if isinstance(d, dict) and "url" in d:
+            imagenes.append(d["url"])
+        else:
+            # Aquí puedes decidir qué hacer:
+            # 1. Ignorar el elemento malformado (como está ahora con el print de advertencia).
+            # 2. Levantar un error para detener la ejecución si las imágenes son obligatorias.
+            #    raise ValueError(f"Image item has incorrect format or missing 'url': {d}")
+            print(f"Advertencia: Elemento de imagen con formato incorrecto o sin 'url': {d}")
+    # --- FIN DE LAS VALIDACIONES DE ENTRADA ---
 
     # Slide resumen global
     slide = pr.slides.add_slide(pr.slide_layouts[5])
@@ -46,6 +69,11 @@ def generar_pptx(data, filename):
         img_path = download_image(url)
         if img_path:
             slide.shapes.add_picture(img_path, Inches(1), Inches(1.5), height=Inches(4.5))
+            # Considera eliminar la imagen temporal después de usarla
+            try:
+                os.remove(img_path)
+            except OSError as e:
+                print(f"Error al eliminar la imagen temporal {img_path}: {e}")
 
     output_path = f"/tmp/{filename}"
     pr.save(output_path)

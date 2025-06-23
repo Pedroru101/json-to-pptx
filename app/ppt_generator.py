@@ -188,10 +188,10 @@ def generar_pptx(data, filename):
 
     # --- SLIDES DE GRÁFICOS ---
     slide_layout_blank = pr.slide_layouts[6]
-    for url in imagenes:
+    for idx, url in enumerate(imagenes):
         slide = pr.slides.add_slide(slide_layout_blank)
         set_slide_background(slide, SLIDE_BG_COLOR_1)
-        logging.info(f"Intentando incrustar imagen desde: {url}")
+        logging.info(f"[IMG {idx+1}/{len(imagenes)}] Intentando incrustar imagen desde: {url}")
         img_path = download_image(url)
         if img_path:
             try:
@@ -213,23 +213,30 @@ def generar_pptx(data, filename):
                 left = (slide_width - scaled_width_emu) / 2
                 top = (slide_height - scaled_height_emu) / 2
                 slide.shapes.add_picture(img_path, left, top, width=scaled_width_emu, height=scaled_height_emu)
-                logging.info(f"Imagen '{url}' incrustada exitosamente.")
+                logging.info(f"[IMG {idx+1}] Imagen '{url}' incrustada exitosamente.")
             except Exception as e:
-                logging.error(f"Error al procesar o añadir imagen {url}: {e}")
+                logging.error(f"[IMG {idx+1}] Error al procesar o añadir imagen {url}: {e}")
+                # Slide de error visual con URL
+                error_box = slide.shapes.add_textbox(Inches(1), Inches(3), Inches(8), Inches(1.2))
+                tf = error_box.text_frame
+                tf.text = f"Error al procesar imagen:\n{url}"
+                tf.paragraphs[0].font.color.rgb = RGBColor(0xFF, 0x00, 0x00)
+                tf.paragraphs[0].font.size = Pt(18)
             finally:
                 if os.path.exists(img_path):
                     try:
                         os.remove(img_path)
-                        logging.info(f"Imagen temporal eliminada: {img_path}")
+                        logging.info(f"[IMG {idx+1}] Imagen temporal eliminada: {img_path}")
                     except OSError as e:
-                        logging.error(f"Error al eliminar la imagen temporal {img_path}: {e}")
+                        logging.error(f"[IMG {idx+1}] Error al eliminar la imagen temporal {img_path}: {e}")
         else:
-            logging.warning(f"Advertencia: No se pudo incrustar la imagen de la URL: {url}")
-            txBox = slide.shapes.add_textbox(Inches(1), Inches(3), Inches(8), Inches(1))
-            tf = txBox.text_frame
-            tf.text = "Error: Imagen no disponible."
+            logging.warning(f"[IMG {idx+1}] No se pudo descargar la imagen de la URL: {url}")
+            # Slide de error visual con URL
+            error_box = slide.shapes.add_textbox(Inches(1), Inches(3), Inches(8), Inches(1.2))
+            tf = error_box.text_frame
+            tf.text = f"No se pudo descargar la imagen:\n{url}"
             tf.paragraphs[0].font.color.rgb = RGBColor(0xFF, 0x00, 0x00)
-            tf.paragraphs[0].font.size = Pt(24)
+            tf.paragraphs[0].font.size = Pt(18)
         add_footer(slide, "Gráfico de Medios")
 
     output_path = f"/tmp/{filename}"

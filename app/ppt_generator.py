@@ -366,8 +366,8 @@ def generar_pptx(data, filename):
                 margin_left_right_inches = Inches(0.5)
                 margin_top_bottom_inches = Inches(0.5)
 
-                max_width_emu = slide_width - (margin_left_right_inches * 2).emu
-                max_height_emu = slide_height - (margin_top_bottom_inches * 2).emu
+                max_width_emu = slide_width - (margin_left_right_inches * 2)
+                max_height_emu = slide_height - (margin_top_bottom_inches * 2)
 
                 if (max_width_emu / aspect_ratio) <= max_height_emu:
                     scaled_width_emu = max_width_emu

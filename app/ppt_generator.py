@@ -51,31 +51,51 @@ def add_footer(slide, text_content):
 
 def agregar_logo(slide):
     """Agrega el logo corporativo en la esquina superior derecha de cada diapositiva."""
+    # URL directa al logo de MMI
     logo_url = "https://mmi-e.com/wp-content/uploads/2021/01/logo-mmi.png"
+    
     try:
         # Ruta temporal para almacenar el logo descargado
         temp_dir = tempfile.gettempdir()
         logo_path = os.path.join(temp_dir, "logo_mmi.png")
         
-        # Primero intentamos verificar si ya existe el archivo temporal
-        if not os.path.exists(logo_path):
-            response = requests.get(logo_url, stream=True, timeout=10)
+        # Intentar descargar el logo si no existe
+        if not os.path.exists(logo_path) or os.path.getsize(logo_path) == 0:
+            logging.info(f"Descargando logo desde {logo_url}")
+            response = requests.get(logo_url, stream=True, timeout=15)
             if response.status_code == 200:
                 with open(logo_path, 'wb') as f:
-                    for chunk in response.iter_content(1024):
+                    for chunk in response.iter_content(chunk_size=8192):
                         f.write(chunk)
+                logging.info(f"Logo descargado correctamente a {logo_path}")
             else:
                 logging.error(f"Error al descargar logo: {response.status_code}")
-                return
+                # Intentar con URL alternativa
+                alt_logo_url = "https://mmi-e.com/wp-content/uploads/2020/09/logo-mmi.png"
+                logging.info(f"Intentando con URL alternativa: {alt_logo_url}")
+                response = requests.get(alt_logo_url, stream=True, timeout=15)
+                if response.status_code == 200:
+                    with open(logo_path, 'wb') as f:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            f.write(chunk)
+                    logging.info(f"Logo alternativo descargado correctamente")
+                else:
+                    logging.error(f"Error al descargar logo alternativo: {response.status_code}")
+                    return
         
-        # Posición en esquina superior derecha
-        left = Inches(8.5)
-        top = Inches(0.2)
-        width = Inches(1.2)
-        
-        # Añadir logo con tamaño fijo
-        logo = slide.shapes.add_picture(logo_path, left, top, width=width)
-        
+        # Verificar que el archivo existe y tiene contenido
+        if os.path.exists(logo_path) and os.path.getsize(logo_path) > 0:
+            # Posición en esquina superior derecha
+            left = Inches(8.5)
+            top = Inches(0.2)
+            width = Inches(1.2)
+            
+            # Añadir logo con tamaño fijo
+            logo = slide.shapes.add_picture(logo_path, left, top, width=width)
+            logging.info(f"Logo añadido correctamente a la diapositiva")
+        else:
+            logging.error(f"El archivo del logo no existe o está vacío: {logo_path}")
+            
     except Exception as e:
         logging.error(f"Error al añadir logo: {e}")
 
@@ -277,6 +297,9 @@ def crear_datos_cobertura(pr, datos, tipo_medio):
         
         # Añadir las primeras noticias
         for i in range(max_noticias_por_slide):
+            if i >= len(noticias_list):
+                break
+                
             noticia = noticias_list[i]
             
             p = tf.add_paragraph()
@@ -288,12 +311,23 @@ def crear_datos_cobertura(pr, datos, tipo_medio):
             p.space_before = Pt(5)
             p.space_after = Pt(2)
             
+            # Párrafo con hipervínculo
             p = tf.add_paragraph()
-            p.text = f"     {noticia.get('titular', 'N/A')}"
-            p.font.name = FUENTES['cuerpo']
-            p.font.size = Pt(11)
-            p.font.color.rgb = COLORES['secundario']
-            p.font.italic = True
+            run = p.add_run()
+            run.text = f"     {noticia.get('titular', 'N/A')}"
+            run.font.name = FUENTES['cuerpo']
+            run.font.size = Pt(11)
+            run.font.color.rgb = COLORES['secundario']
+            run.font.italic = True
+            
+            # Añadir hipervínculo al titular
+            if 'url' in noticia and noticia['url']:
+                hlink = run.hyperlink
+                hlink.address = noticia['url']
+            elif 'link' in noticia and noticia['link']:
+                hlink = run.hyperlink
+                hlink.address = noticia['link']
+            
             p.space_after = Pt(8)
         
         # Si hay más noticias, crear una nueva diapositiva
@@ -364,12 +398,23 @@ def crear_datos_cobertura(pr, datos, tipo_medio):
                 p.space_before = Pt(5)
                 p.space_after = Pt(2)
                 
+                # Párrafo con hipervínculo
                 p = tf.add_paragraph()
-                p.text = f"     {noticia.get('titular', 'N/A')}"
-                p.font.name = FUENTES['cuerpo']
-                p.font.size = Pt(11)
-                p.font.color.rgb = COLORES['secundario']
-                p.font.italic = True
+                run = p.add_run()
+                run.text = f"     {noticia.get('titular', 'N/A')}"
+                run.font.name = FUENTES['cuerpo']
+                run.font.size = Pt(11)
+                run.font.color.rgb = COLORES['secundario']
+                run.font.italic = True
+                
+                # Añadir hipervínculo al titular
+                if 'url' in noticia and noticia['url']:
+                    hlink = run.hyperlink
+                    hlink.address = noticia['url']
+                elif 'link' in noticia and noticia['link']:
+                    hlink = run.hyperlink
+                    hlink.address = noticia['link']
+                
                 p.space_after = Pt(8)
             
             # Añadir logo a la diapositiva de continuación
@@ -437,11 +482,12 @@ def crear_graficos(pr, datos):
             temp_dir = tempfile.gettempdir()
             img_path = os.path.join(temp_dir, f"grafico_{hash(url)}.png")
             
-            response = requests.get(url, stream=True, timeout=10)
+            response = requests.get(url, stream=True, timeout=15)
             if response.status_code == 200:
                 with open(img_path, 'wb') as f:
-                    for chunk in response.iter_content(1024):
+                    for chunk in response.iter_content(chunk_size=8192):
                         f.write(chunk)
+                logging.info(f"Gráfico descargado correctamente: {url}")
             else:
                 logging.error(f"Error al descargar gráfico: {response.status_code}")
                 img_path = None
@@ -449,13 +495,19 @@ def crear_graficos(pr, datos):
             logging.error(f"Error descargando gráfico {url}: {e}")
             img_path = None
         
+        # Área de contenido principal (centrado en la diapositiva)
+        content_area_top = Inches(1.5)
+        content_area_height = Inches(5)
+        content_area_left = Inches(0.5)
+        content_area_width = Inches(9)
+        
         # Añadir marco decorativo para el gráfico
         chart_frame = slide.shapes.add_shape(
             MSO_SHAPE.RECTANGLE,
-            Inches(0.5),
-            Inches(1.5),
-            Inches(9),
-            Inches(5)
+            content_area_left,
+            content_area_top,
+            content_area_width,
+            content_area_height
         )
         chart_frame.fill.solid()
         chart_frame.fill.fore_color.rgb = COLORES['blanco']
@@ -464,7 +516,7 @@ def crear_graficos(pr, datos):
         chart_frame.shadow.inherit = False
         
         # Intentar insertar el gráfico si se descargó correctamente
-        if img_path and os.path.exists(img_path):
+        if img_path and os.path.exists(img_path) and os.path.getsize(img_path) > 0:
             try:
                 # Obtener dimensiones de la imagen
                 img = Image.open(img_path)
@@ -472,20 +524,29 @@ def crear_graficos(pr, datos):
                 aspect_ratio = img_width / img_height
                 
                 # Calcular tamaño manteniendo proporción
-                target_width = Inches(8.5)
-                target_height = target_width / aspect_ratio
-                max_height = Inches(4.6)
+                # Dejamos margen de 0.5 pulgadas a cada lado
+                max_width = content_area_width - Inches(1)
+                max_height = content_area_height - Inches(0.5)
                 
-                # Ajustar si excede altura máxima
-                if target_height > max_height:
+                # Calcular dimensiones para mantener proporción y centrar
+                if aspect_ratio > 1:  # Imagen más ancha que alta
+                    target_width = max_width
+                    target_height = target_width / aspect_ratio
+                    if target_height > max_height:
+                        target_height = max_height
+                        target_width = target_height * aspect_ratio
+                else:  # Imagen más alta que ancha
                     target_height = max_height
                     target_width = target_height * aspect_ratio
+                    if target_width > max_width:
+                        target_width = max_width
+                        target_height = target_width / aspect_ratio
                 
-                # Calcular posición para centrar
-                left = Inches(0.75) + (Inches(9) - target_width) / 2
-                top = Inches(1.7) + (Inches(4.8) - target_height) / 2
+                # Calcular posición para centrar perfectamente
+                left = content_area_left + (content_area_width - target_width) / 2
+                top = content_area_top + (content_area_height - target_height) / 2
                 
-                # Insertar imagen del gráfico (importante: debe estar sobre el marco)
+                # Insertar imagen del gráfico
                 pic = slide.shapes.add_picture(
                     img_path,
                     left,
@@ -494,18 +555,16 @@ def crear_graficos(pr, datos):
                     height=target_height
                 )
                 
-                # Mover el gráfico al frente
-                for i in range(len(slide.shapes) - 1):
-                    slide.shapes._spTree.remove(slide.shapes._spTree[-1])
-                    slide.shapes._spTree.insert(2, pic._element)
+                # Asegurarse de que el gráfico esté en primer plano
+                pic.z_order = -1  # Poner en primer plano
                 
             except Exception as e:
                 logging.error(f"Error al insertar gráfico {url}: {e}")
                 
                 # Mostrar mensaje de error
                 error_box = slide.shapes.add_textbox(
-                    Inches(2),
-                    Inches(3),
+                    content_area_left + Inches(1.5),
+                    content_area_top + Inches(2),
                     Inches(6),
                     Inches(1)
                 )
@@ -526,8 +585,8 @@ def crear_graficos(pr, datos):
         else:
             # Mostrar mensaje de error si no se pudo descargar
             error_box = slide.shapes.add_textbox(
-                Inches(2),
-                Inches(3),
+                content_area_left + Inches(1.5),
+                content_area_top + Inches(2),
                 Inches(6),
                 Inches(1)
             )

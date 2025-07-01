@@ -129,6 +129,36 @@ def formatear_fecha(fecha_str):
         logging.error(f"Error al formatear fecha '{fecha_str}': {e}")
         return fecha_str
 
+def formatear_moneda(valor):
+    """
+    Añade el símbolo de euro (€) a los valores monetarios.
+    """
+    if not valor or valor == 'N/A':
+        return 'N/A'
+    
+    try:
+        # Si es un número, lo formateamos con el símbolo del euro
+        if isinstance(valor, (int, float)):
+            return f"{valor:,.2f} €".replace(',', '.').replace('.', ',', 1)
+        
+        # Si es una cadena que representa un número
+        valor_str = str(valor).strip()
+        if valor_str.replace('.', '', 1).replace(',', '', 1).isdigit():
+            # Intentamos convertir a float y formatear
+            try:
+                # Reemplazar comas por puntos para la conversión
+                valor_num = float(valor_str.replace(',', '.'))
+                return f"{valor_num:,.2f} €".replace(',', '.').replace('.', ',', 1)
+            except ValueError:
+                # Si no se puede convertir, solo añadimos el símbolo
+                return f"{valor_str} €"
+        else:
+            # Si no es un número, solo devolvemos el valor original con el símbolo
+            return f"{valor_str} €"
+    except Exception as e:
+        logging.error(f"Error al formatear valor monetario '{valor}': {e}")
+        return f"{valor} €"
+
 def crear_portada(pr, datos):
     slide = pr.slides.add_slide(pr.slide_layouts[5])  # Usar layout en blanco
     aplicar_estilo_slide(slide)
@@ -145,11 +175,11 @@ def crear_portada(pr, datos):
     top_rect.fill.fore_color.rgb = COLORES['principal']
     top_rect.line.fill.background()
     
-    # Título principal centrado horizontalmente
+    # Título principal centrado horizontalmente, ajustado para no solaparse con el logo
     title = slide.shapes.add_textbox(
-        0,
+        Inches(1.8),  # Mover hacia la derecha para evitar solapamiento con el logo
         Inches(2.5),
-        Inches(10),
+        Inches(6.4),  # Reducir ancho para centrar mejor
         Inches(1)
     )
     tf = title.text_frame
@@ -162,9 +192,9 @@ def crear_portada(pr, datos):
     
     # Subtítulo con período
     subtitle = slide.shapes.add_textbox(
-        0,
+        Inches(1.8),  # Ajustar para alinear con el título
         Inches(4),
-        Inches(10),
+        Inches(6.4),  # Mismo ancho que el título
         Inches(0.75)
     )
     tf = subtitle.text_frame
@@ -175,7 +205,7 @@ def crear_portada(pr, datos):
     p.font.color.rgb = COLORES['secundario']
     p.alignment = PP_ALIGN.CENTER
     
-    # Añadir logo
+    # Añadir logo - asegurar que se añada después de crear todos los elementos
     agregar_logo(slide)
     add_footer(slide, "Informe de Medios")
 
@@ -269,11 +299,11 @@ def crear_datos_cobertura(pr, datos, tipo_medio):
     title_box.fill.fore_color.rgb = COLORES['principal']
     title_box.line.fill.background()
     
-    # Título centrado horizontalmente
+    # Título centrado horizontalmente, ajustado para no solaparse con el logo
     title = slide.shapes.add_textbox(
-        0,
+        Inches(1.8),  # Ajustar para dejar espacio al logo
         Inches(0.2),
-        Inches(10),
+        Inches(6.4),  # Reducir ancho para centrar mejor
         Inches(0.6)
     )
     tf = title.text_frame
@@ -300,6 +330,10 @@ def crear_datos_cobertura(pr, datos, tipo_medio):
     tf = summary_box.text_frame
     tf.word_wrap = True
     
+    # Formatear valores monetarios con símbolo de euro
+    vpe_formateado = formatear_moneda(medio_data.get('total_vpe', 'N/A'))
+    vc_formateado = formatear_moneda(medio_data.get('total_vc', 'N/A'))
+    
     # Datos de resumen con iconos
     p = tf.add_paragraph()
     p.text = f"📊 Total de Noticias: {medio_data.get('cantidad_noticias', 'N/A')}"
@@ -314,7 +348,7 @@ def crear_datos_cobertura(pr, datos, tipo_medio):
     p.font.color.rgb = COLORES['texto_oscuro']
     
     p = tf.add_paragraph()
-    p.text = f"💰 VPE: {medio_data.get('total_vpe', 'N/A')} | VC: {medio_data.get('total_vc', 'N/A')}"
+    p.text = f"💰 VPE: {vpe_formateado} | VC: {vc_formateado}"
     p.font.name = FUENTES['cuerpo']
     p.font.size = Pt(14)
     p.font.color.rgb = COLORES['texto_oscuro']
@@ -568,11 +602,11 @@ def crear_diapositiva_grafico(pr, url):
     title_box.fill.fore_color.rgb = COLORES['principal']
     title_box.line.fill.background()
     
-    # Título
+    # Título centrado horizontalmente, ajustado para no solaparse con el logo
     title = slide.shapes.add_textbox(
-        0,
+        Inches(1.8),  # Ajustar para dejar espacio al logo
         Inches(0.2),
-        Inches(10),
+        Inches(6.4),  # Reducir ancho para centrar mejor
         Inches(0.6)
     )
     tf = title.text_frame
@@ -742,11 +776,11 @@ def crear_vpe_totales(pr, datos):
     title_box.fill.fore_color.rgb = COLORES['principal']
     title_box.line.fill.background()
     
-    # Título centrado horizontalmente
+    # Título centrado horizontalmente, ajustado para no solaparse con el logo
     title = slide.shapes.add_textbox(
-        0,
+        Inches(1.8),  # Ajustar para dejar espacio al logo
         Inches(0.2),
-        Inches(10),
+        Inches(6.4),  # Reducir ancho para centrar mejor
         Inches(0.6)
     )
     tf = title.text_frame
@@ -781,8 +815,11 @@ def crear_vpe_totales(pr, datos):
     p.alignment = PP_ALIGN.CENTER
     p.space_after = Pt(20)
     
+    # Formatear el valor VPE con símbolo de euro
+    vpe_formateado = formatear_moneda(datos.get('totalGlobalVPE', 'N/A'))
+    
     p = tf.add_paragraph()
-    p.text = f"VPE Total: {datos.get('totalGlobalVPE', 'N/A')}"
+    p.text = f"VPE Total: {vpe_formateado}"
     p.font.name = FUENTES['cuerpo']
     p.font.size = Pt(28)
     p.font.color.rgb = COLORES['principal']

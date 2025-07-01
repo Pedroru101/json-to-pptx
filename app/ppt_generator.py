@@ -132,29 +132,21 @@ def formatear_fecha(fecha_str):
 def formatear_moneda(valor):
     """
     Añade el símbolo de euro (€) a los valores monetarios.
+    Preserva los puntos como separadores de miles.
     """
     if not valor or valor == 'N/A':
         return 'N/A'
     
     try:
-        # Si es un número, lo formateamos con el símbolo del euro
-        if isinstance(valor, (int, float)):
-            return f"{valor:,.2f} €".replace(',', '.').replace('.', ',', 1)
-        
-        # Si es una cadena que representa un número
+        # Convertir el valor a string si no lo es
         valor_str = str(valor).strip()
-        if valor_str.replace('.', '', 1).replace(',', '', 1).isdigit():
-            # Intentamos convertir a float y formatear
-            try:
-                # Reemplazar comas por puntos para la conversión
-                valor_num = float(valor_str.replace(',', '.'))
-                return f"{valor_num:,.2f} €".replace(',', '.').replace('.', ',', 1)
-            except ValueError:
-                # Si no se puede convertir, solo añadimos el símbolo
-                return f"{valor_str} €"
-        else:
-            # Si no es un número, solo devolvemos el valor original con el símbolo
-            return f"{valor_str} €"
+        
+        # Si ya tiene el símbolo de euro, lo devolvemos tal cual
+        if '€' in valor_str:
+            return valor_str
+        
+        # Añadir el símbolo de euro al final
+        return f"{valor_str} €"
     except Exception as e:
         logging.error(f"Error al formatear valor monetario '{valor}': {e}")
         return f"{valor} €"
@@ -436,18 +428,33 @@ def crear_datos_cobertura(pr, datos, tipo_medio):
             title_box.fill.fore_color.rgb = COLORES['principal']
             title_box.line.fill.background()
             
-            # Título
+            # Título principal
             title = slide_continuacion.shapes.add_textbox(
-                0,
+                Inches(1.8),
                 Inches(0.2),
-                Inches(10),
+                Inches(6.4),
                 Inches(0.6)
             )
             tf = title.text_frame
-            tf.text = f"Datos de Cobertura - {tipo_medio} (Continuación)"
+            tf.text = f"Datos de Cobertura - {tipo_medio}"
             p = tf.paragraphs[0]
             p.font.name = FUENTES['titulo']
             p.font.size = Pt(28)
+            p.font.color.rgb = COLORES['blanco']
+            p.alignment = PP_ALIGN.CENTER
+            
+            # Subtítulo (Continuación) debajo del título principal
+            subtitle = slide_continuacion.shapes.add_textbox(
+                Inches(1.8),
+                Inches(0.6),  # Justo debajo del título
+                Inches(6.4),
+                Inches(0.4)
+            )
+            tf = subtitle.text_frame
+            tf.text = "(Continuación)"
+            p = tf.paragraphs[0]
+            p.font.name = FUENTES['subtitulo']
+            p.font.size = Pt(16)  # 40% más pequeño que el título principal
             p.font.color.rgb = COLORES['blanco']
             p.alignment = PP_ALIGN.CENTER
             
@@ -468,7 +475,7 @@ def crear_datos_cobertura(pr, datos, tipo_medio):
             tf.word_wrap = True
             
             p = tf.add_paragraph()
-            p.text = "📰 Noticias Destacadas (Continuación)"
+            p.text = "📰 Noticias Destacadas"
             p.font.name = FUENTES['subtitulo']
             p.font.size = Pt(16)
             p.font.color.rgb = COLORES['secundario']

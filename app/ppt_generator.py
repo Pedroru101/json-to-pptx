@@ -7,6 +7,8 @@ from PIL import Image
 import os
 import logging
 from app.utils import download_image
+import tempfile
+import requests
 
 # Configuración de logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -50,25 +52,32 @@ def add_footer(slide, text_content):
 def agregar_logo(slide):
     """Agrega el logo corporativo en la esquina superior derecha de cada diapositiva."""
     logo_url = "https://mmi-e.com/wp-content/uploads/2021/01/logo-mmi.png"
-    logo_path = download_image(logo_url)
-    
-    if logo_path and os.path.exists(logo_path):
-        try:
-            # Posición en esquina superior derecha
-            left = Inches(8.5)  # 10 inches (ancho total) - 1.5 inches (ancho del logo)
-            top = Inches(0.2)
-            width = Inches(1.2)
-            
-            # Añadir logo con tamaño fijo
-            logo = slide.shapes.add_picture(logo_path, left, top, width=width)
-            
-        except Exception as e:
-            logging.error(f"Error al añadir logo: {e}")
-        finally:
-            try:
-                os.remove(logo_path)
-            except OSError as e:
-                logging.error(f"Error al eliminar logo temporal: {e}")
+    try:
+        # Ruta temporal para almacenar el logo descargado
+        temp_dir = tempfile.gettempdir()
+        logo_path = os.path.join(temp_dir, "logo_mmi.png")
+        
+        # Primero intentamos verificar si ya existe el archivo temporal
+        if not os.path.exists(logo_path):
+            response = requests.get(logo_url, stream=True, timeout=10)
+            if response.status_code == 200:
+                with open(logo_path, 'wb') as f:
+                    for chunk in response.iter_content(1024):
+                        f.write(chunk)
+            else:
+                logging.error(f"Error al descargar logo: {response.status_code}")
+                return
+        
+        # Posición en esquina superior derecha
+        left = Inches(8.5)
+        top = Inches(0.2)
+        width = Inches(1.2)
+        
+        # Añadir logo con tamaño fijo
+        logo = slide.shapes.add_picture(logo_path, left, top, width=width)
+        
+    except Exception as e:
+        logging.error(f"Error al añadir logo: {e}")
 
 def crear_portada(pr, datos):
     slide = pr.slides.add_slide(pr.slide_layouts[5])  # Usar layout en blanco
@@ -214,6 +223,7 @@ def crear_datos_cobertura(pr, datos, tipo_medio):
     summary_box.fill.solid()
     summary_box.fill.fore_color.rgb = COLORES['blanco']
     summary_box.line.color.rgb = COLORES['secundario']
+    summary_box.shadow.inherit = False
     
     tf = summary_box.text_frame
     tf.word_wrap = True
@@ -237,9 +247,12 @@ def crear_datos_cobertura(pr, datos, tipo_medio):
     p.font.size = Pt(14)
     p.font.color.rgb = COLORES['texto_oscuro']
     
-    # Lista de noticias con scroll
+    # Lista de noticias
     noticias_list = medio_data.get("noticias", [])
     if noticias_list:
+        # Calcular cuántas noticias podemos mostrar por diapositiva (máx 4)
+        max_noticias_por_slide = min(4, len(noticias_list))
+        
         news_box = slide.shapes.add_shape(
             MSO_SHAPE.RECTANGLE,
             Inches(1),
@@ -250,80 +263,29 @@ def crear_datos_cobertura(pr, datos, tipo_medio):
         news_box.fill.solid()
         news_box.fill.fore_color.rgb = COLORES['blanco']
         news_box.line.color.rgb = COLORES['gris_claro']
+        news_box.shadow.inherit = False
         
         tf = news_box.text_frame
         tf.word_wrap = True
-        tf.auto_size = MSO_AUTO_SIZE.SHAPE_TO_FIT_TEXT
         
         p = tf.add_paragraph()
         p.text = "📰 Noticias Destacadas"
         p.font.name = FUENTES['subtitulo']
         p.font.size = Pt(16)
         p.font.color.rgb = COLORES['secundario']
-        p.space_after = Pt(12)
+        p.space_after = Pt(10)
         
-        items_per_slide = 4
-        current_items = 0
-        
-        for noticia in noticias_list:
-            if current_items >= items_per_slide:
-                # Nueva diapositiva para más noticias
-                slide = pr.slides.add_slide(pr.slide_layouts[5])
-                aplicar_estilo_slide(slide)
-                
-                # Barra de título
-                title_box = slide.shapes.add_shape(
-                    MSO_SHAPE.RECTANGLE,
-                    0,
-                    0,
-                    Inches(10),
-                    Inches(1)
-                )
-                title_box.fill.solid()
-                title_box.fill.fore_color.rgb = COLORES['principal']
-                title_box.line.fill.background()
-                
-                # Título
-                title = slide.shapes.add_textbox(
-                    0,
-                    Inches(0.2),
-                    Inches(10),
-                    Inches(0.6)
-                )
-                tf = title.text_frame
-                tf.text = f"Datos de Cobertura - {tipo_medio} (Continuación)"
-                p = tf.paragraphs[0]
-                p.font.name = FUENTES['titulo']
-                p.font.size = Pt(28)
-                p.font.color.rgb = COLORES['blanco']
-                p.alignment = PP_ALIGN.CENTER
-                
-                # Nueva caja de noticias
-                news_box = slide.shapes.add_shape(
-                    MSO_SHAPE.RECTANGLE,
-                    Inches(1),
-                    Inches(1.5),
-                    Inches(8),
-                    Inches(4.5)
-                )
-                news_box.fill.solid()
-                news_box.fill.fore_color.rgb = COLORES['blanco']
-                news_box.line.color.rgb = COLORES['gris_claro']
-                
-                tf = news_box.text_frame
-                tf.word_wrap = True
-                tf.auto_size = MSO_AUTO_SIZE.SHAPE_TO_FIT_TEXT
-                current_items = 0
-                
-                # Añadir logo a la nueva diapositiva
-                agregar_logo(slide)
+        # Añadir las primeras noticias
+        for i in range(max_noticias_por_slide):
+            noticia = noticias_list[i]
             
             p = tf.add_paragraph()
             p.text = f"📅 {noticia.get('fecha', 'N/A')} - {noticia.get('titulo', 'N/A')}"
             p.font.name = FUENTES['cuerpo']
             p.font.size = Pt(12)
             p.font.color.rgb = COLORES['texto_oscuro']
-            p.space_before = Pt(6)
+            p.font.bold = True
+            p.space_before = Pt(5)
             p.space_after = Pt(2)
             
             p = tf.add_paragraph()
@@ -332,9 +294,87 @@ def crear_datos_cobertura(pr, datos, tipo_medio):
             p.font.size = Pt(11)
             p.font.color.rgb = COLORES['secundario']
             p.font.italic = True
-            p.space_after = Pt(12)
+            p.space_after = Pt(8)
+        
+        # Si hay más noticias, crear una nueva diapositiva
+        if len(noticias_list) > max_noticias_por_slide:
+            slide_continuacion = pr.slides.add_slide(pr.slide_layouts[5])
+            aplicar_estilo_slide(slide_continuacion)
             
-            current_items += 1
+            # Barra de título
+            title_box = slide_continuacion.shapes.add_shape(
+                MSO_SHAPE.RECTANGLE,
+                0,
+                0,
+                Inches(10),
+                Inches(1)
+            )
+            title_box.fill.solid()
+            title_box.fill.fore_color.rgb = COLORES['principal']
+            title_box.line.fill.background()
+            
+            # Título
+            title = slide_continuacion.shapes.add_textbox(
+                0,
+                Inches(0.2),
+                Inches(10),
+                Inches(0.6)
+            )
+            tf = title.text_frame
+            tf.text = f"Datos de Cobertura - {tipo_medio} (Continuación)"
+            p = tf.paragraphs[0]
+            p.font.name = FUENTES['titulo']
+            p.font.size = Pt(28)
+            p.font.color.rgb = COLORES['blanco']
+            p.alignment = PP_ALIGN.CENTER
+            
+            # Caja de noticias
+            news_box = slide_continuacion.shapes.add_shape(
+                MSO_SHAPE.RECTANGLE,
+                Inches(1),
+                Inches(1.5),
+                Inches(8),
+                Inches(5)
+            )
+            news_box.fill.solid()
+            news_box.fill.fore_color.rgb = COLORES['blanco']
+            news_box.line.color.rgb = COLORES['gris_claro']
+            news_box.shadow.inherit = False
+            
+            tf = news_box.text_frame
+            tf.word_wrap = True
+            
+            p = tf.add_paragraph()
+            p.text = "📰 Noticias Destacadas (Continuación)"
+            p.font.name = FUENTES['subtitulo']
+            p.font.size = Pt(16)
+            p.font.color.rgb = COLORES['secundario']
+            p.space_after = Pt(10)
+            
+            # Añadir las noticias restantes
+            for i in range(max_noticias_por_slide, len(noticias_list)):
+                noticia = noticias_list[i]
+                
+                p = tf.add_paragraph()
+                p.text = f"📅 {noticia.get('fecha', 'N/A')} - {noticia.get('titulo', 'N/A')}"
+                p.font.name = FUENTES['cuerpo']
+                p.font.size = Pt(12)
+                p.font.color.rgb = COLORES['texto_oscuro']
+                p.font.bold = True
+                p.space_before = Pt(5)
+                p.space_after = Pt(2)
+                
+                p = tf.add_paragraph()
+                p.text = f"     {noticia.get('titular', 'N/A')}"
+                p.font.name = FUENTES['cuerpo']
+                p.font.size = Pt(11)
+                p.font.color.rgb = COLORES['secundario']
+                p.font.italic = True
+                p.space_after = Pt(8)
+            
+            # Añadir logo a la diapositiva de continuación
+            agregar_logo(slide_continuacion)
+            add_footer(slide_continuacion, f"Cobertura {tipo_medio} - Informe de Medios")
     
     # Añadir logo
     agregar_logo(slide)
@@ -390,47 +430,79 @@ def crear_graficos(pr, datos):
         p.font.color.rgb = COLORES['blanco']
         p.alignment = PP_ALIGN.CENTER
         
-        # Contenedor para el gráfico con fondo y sombra
-        chart_container = slide.shapes.add_shape(
+        # Primero descargamos la imagen del gráfico
+        img_path = None
+        try:
+            # Usar requests para descargar la imagen
+            temp_dir = tempfile.gettempdir()
+            img_path = os.path.join(temp_dir, f"grafico_{hash(url)}.png")
+            
+            response = requests.get(url, stream=True, timeout=10)
+            if response.status_code == 200:
+                with open(img_path, 'wb') as f:
+                    for chunk in response.iter_content(1024):
+                        f.write(chunk)
+            else:
+                logging.error(f"Error al descargar gráfico: {response.status_code}")
+                img_path = None
+        except Exception as e:
+            logging.error(f"Error descargando gráfico {url}: {e}")
+            img_path = None
+        
+        # Añadir marco decorativo para el gráfico
+        chart_frame = slide.shapes.add_shape(
             MSO_SHAPE.RECTANGLE,
             Inches(0.5),
             Inches(1.5),
             Inches(9),
             Inches(5)
         )
-        chart_container.fill.solid()
-        chart_container.fill.fore_color.rgb = COLORES['blanco']
-        chart_container.line.color.rgb = COLORES['gris_claro']
-        chart_container.shadow.inherit = False
+        chart_frame.fill.solid()
+        chart_frame.fill.fore_color.rgb = COLORES['blanco']
+        chart_frame.line.color.rgb = COLORES['secundario']
+        chart_frame.line.width = Pt(2)
+        chart_frame.shadow.inherit = False
         
-        # Descargar e insertar gráfico
-        img_path = download_image(url)
+        # Intentar insertar el gráfico si se descargó correctamente
         if img_path and os.path.exists(img_path):
             try:
-                # Calcular dimensiones manteniendo proporción
+                # Obtener dimensiones de la imagen
                 img = Image.open(img_path)
                 img_width, img_height = img.size
                 aspect_ratio = img_width / img_height
                 
-                # Ajustar dimensiones
+                # Calcular tamaño manteniendo proporción
                 target_width = Inches(8.5)
                 target_height = target_width / aspect_ratio
+                max_height = Inches(4.6)
                 
-                # Centrar el gráfico
-                left = Inches(0.75)
-                top = Inches(1.7)
+                # Ajustar si excede altura máxima
+                if target_height > max_height:
+                    target_height = max_height
+                    target_width = target_height * aspect_ratio
                 
-                # Insertar gráfico con z-order alto para estar en primer plano
+                # Calcular posición para centrar
+                left = Inches(0.75) + (Inches(9) - target_width) / 2
+                top = Inches(1.7) + (Inches(4.8) - target_height) / 2
+                
+                # Insertar imagen del gráfico (importante: debe estar sobre el marco)
                 pic = slide.shapes.add_picture(
                     img_path,
                     left,
                     top,
                     width=target_width,
-                    height=min(target_height, Inches(4.6))
+                    height=target_height
                 )
                 
+                # Mover el gráfico al frente
+                for i in range(len(slide.shapes) - 1):
+                    slide.shapes._spTree.remove(slide.shapes._spTree[-1])
+                    slide.shapes._spTree.insert(2, pic._element)
+                
             except Exception as e:
-                logging.error(f"Error al procesar gráfico {url}: {e}")
+                logging.error(f"Error al insertar gráfico {url}: {e}")
+                
+                # Mostrar mensaje de error
                 error_box = slide.shapes.add_textbox(
                     Inches(2),
                     Inches(3),
@@ -439,44 +511,84 @@ def crear_graficos(pr, datos):
                 )
                 tf = error_box.text_frame
                 tf.text = "Error al cargar el gráfico"
-                tf.paragraphs[0].font.color.rgb = COLORES['acento']
-                tf.paragraphs[0].font.size = Pt(14)
-                tf.paragraphs[0].alignment = PP_ALIGN.CENTER
+                p = tf.paragraphs[0]
+                p.font.color.rgb = COLORES['acento']
+                p.font.size = Pt(16)
+                p.font.bold = True
+                p.alignment = PP_ALIGN.CENTER
             finally:
+                # Limpiar archivo temporal
                 try:
-                    os.remove(img_path)
-                except OSError as e:
-                    logging.error(f"Error al eliminar imagen temporal {img_path}: {e}")
+                    if os.path.exists(img_path):
+                        os.remove(img_path)
+                except:
+                    pass
+        else:
+            # Mostrar mensaje de error si no se pudo descargar
+            error_box = slide.shapes.add_textbox(
+                Inches(2),
+                Inches(3),
+                Inches(6),
+                Inches(1)
+            )
+            tf = error_box.text_frame
+            tf.text = "Error al descargar el gráfico"
+            p = tf.paragraphs[0]
+            p.font.color.rgb = COLORES['acento']
+            p.font.size = Pt(16)
+            p.font.bold = True
+            p.alignment = PP_ALIGN.CENTER
         
         # Añadir logo
         agregar_logo(slide)
         add_footer(slide, f"{tipo_grafico} - Informe de Medios")
 
 def crear_vpe_totales(pr, datos):
-    slide = pr.slides.add_slide(pr.slide_layouts[2])
+    slide = pr.slides.add_slide(pr.slide_layouts[5])
     aplicar_estilo_slide(slide)
     
-    # Barra de título
-    title_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0), Inches(0.5), Inches(10), Inches(0.8))
+    # Barra de título horizontal
+    title_box = slide.shapes.add_shape(
+        MSO_SHAPE.RECTANGLE,
+        0,
+        0,
+        Inches(10),
+        Inches(1)
+    )
     title_box.fill.solid()
     title_box.fill.fore_color.rgb = COLORES['principal']
     title_box.line.fill.background()
     
-    title = slide.shapes.title
-    title.top = Inches(0.6)
-    title.text = "Valor Publicitario Equivalente (VPE) Total"
-    title.text_frame.paragraphs[0].font.name = FUENTES['titulo']
-    title.text_frame.paragraphs[0].font.size = Pt(32)
-    title.text_frame.paragraphs[0].font.color.rgb = COLORES['blanco']
-    title.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
+    # Título centrado horizontalmente
+    title = slide.shapes.add_textbox(
+        0,
+        Inches(0.2),
+        Inches(10),
+        Inches(0.6)
+    )
+    tf = title.text_frame
+    tf.text = "Valor Publicitario Equivalente (VPE) Total"
+    p = tf.paragraphs[0]
+    p.font.name = FUENTES['titulo']
+    p.font.size = Pt(28)
+    p.font.color.rgb = COLORES['blanco']
+    p.alignment = PP_ALIGN.CENTER
     
     # Caja de datos VPE
-    vpe_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(1), Inches(2), Inches(8), Inches(4))
+    vpe_box = slide.shapes.add_shape(
+        MSO_SHAPE.RECTANGLE,
+        Inches(1),
+        Inches(2),
+        Inches(8),
+        Inches(3.5)
+    )
     vpe_box.fill.solid()
     vpe_box.fill.fore_color.rgb = COLORES['blanco']
     vpe_box.line.color.rgb = COLORES['secundario']
+    vpe_box.shadow.inherit = False
     
     tf = vpe_box.text_frame
+    tf.word_wrap = True
     
     p = tf.add_paragraph()
     p.text = "Resumen de Valor Publicitario"
@@ -484,14 +596,18 @@ def crear_vpe_totales(pr, datos):
     p.font.size = Pt(20)
     p.font.color.rgb = COLORES['secundario']
     p.alignment = PP_ALIGN.CENTER
+    p.space_after = Pt(20)
     
     p = tf.add_paragraph()
     p.text = f"VPE Total: {datos.get('totalGlobalVPE', 'N/A')}"
     p.font.name = FUENTES['cuerpo']
     p.font.size = Pt(28)
     p.font.color.rgb = COLORES['principal']
+    p.font.bold = True
     p.alignment = PP_ALIGN.CENTER
     
+    # Añadir logo
+    agregar_logo(slide)
     add_footer(slide, "VPE Total - Informe de Medios")
 
 def generar_pptx(data, filename):

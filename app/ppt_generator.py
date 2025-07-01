@@ -48,32 +48,50 @@ def add_footer(slide, text_content):
     p.alignment = PP_ALIGN.CENTER
 
 def crear_portada(pr, datos):
-    slide = pr.slides.add_slide(pr.slide_layouts[0])
+    slide = pr.slides.add_slide(pr.slide_layouts[5])  # Usar layout en blanco
     aplicar_estilo_slide(slide)
     
-    # Añadir rectángulo decorativo superior
-    top_rect = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0), Inches(0), Inches(10), Inches(1.5))
+    # Barra superior decorativa
+    top_rect = slide.shapes.add_shape(
+        MSO_SHAPE.RECTANGLE,
+        0,
+        0,
+        Inches(10),
+        Inches(1.5)
+    )
     top_rect.fill.solid()
     top_rect.fill.fore_color.rgb = COLORES['principal']
     top_rect.line.fill.background()
     
-    # Título principal
-    title = slide.shapes.title
-    title.top = Inches(2.5)
-    title.text = "Informe de Medios"
-    title.text_frame.paragraphs[0].font.name = FUENTES['titulo']
-    title.text_frame.paragraphs[0].font.size = Pt(44)
-    title.text_frame.paragraphs[0].font.color.rgb = COLORES['principal']
-    title.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
+    # Título principal centrado horizontalmente
+    title = slide.shapes.add_textbox(
+        0,
+        Inches(2.5),
+        Inches(10),
+        Inches(1)
+    )
+    tf = title.text_frame
+    tf.text = "Informe de Medios"
+    p = tf.paragraphs[0]
+    p.font.name = FUENTES['titulo']
+    p.font.size = Pt(44)
+    p.font.color.rgb = COLORES['principal']
+    p.alignment = PP_ALIGN.CENTER
     
     # Subtítulo con período
-    subtitle = slide.placeholders[1]
-    subtitle.top = Inches(4)
-    subtitle.text = f"Período: {datos.get('fechaInicial', 'N/A')} - {datos.get('fechaFinal', 'N/A')}"
-    subtitle.text_frame.paragraphs[0].font.name = FUENTES['subtitulo']
-    subtitle.text_frame.paragraphs[0].font.size = Pt(24)
-    subtitle.text_frame.paragraphs[0].font.color.rgb = COLORES['secundario']
-    subtitle.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
+    subtitle = slide.shapes.add_textbox(
+        0,
+        Inches(4),
+        Inches(10),
+        Inches(0.75)
+    )
+    tf = subtitle.text_frame
+    tf.text = f"Período: {datos.get('fechaInicial', 'N/A')} - {datos.get('fechaFinal', 'N/A')}"
+    p = tf.paragraphs[0]
+    p.font.name = FUENTES['subtitulo']
+    p.font.size = Pt(24)
+    p.font.color.rgb = COLORES['secundario']
+    p.alignment = PP_ALIGN.CENTER
     
     add_footer(slide, "Informe de Medios")
 
@@ -126,26 +144,39 @@ def crear_metodologia(pr):
     add_footer(slide, "Metodología - Informe de Medios")
 
 def crear_datos_cobertura(pr, datos, tipo_medio):
-    slide = pr.slides.add_slide(pr.slide_layouts[2])
+    slide = pr.slides.add_slide(pr.slide_layouts[5])  # Usar layout en blanco
     aplicar_estilo_slide(slide)
     
     medio_data = datos.get(f"{tipo_medio}_raw", {})
     if not medio_data:
         return
     
-    # Título con barra de color
-    title_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0), Inches(0.5), Inches(10), Inches(0.8))
+    # Barra de título horizontal
+    title_box = slide.shapes.add_shape(
+        MSO_SHAPE.RECTANGLE,
+        0,
+        0,
+        Inches(10),
+        Inches(1)
+    )
     title_box.fill.solid()
     title_box.fill.fore_color.rgb = COLORES['principal']
     title_box.line.fill.background()
     
-    title = slide.shapes.title
-    title.top = Inches(0.6)
-    title.text = f"Datos de Cobertura - {tipo_medio}"
-    title.text_frame.paragraphs[0].font.name = FUENTES['titulo']
-    title.text_frame.paragraphs[0].font.size = Pt(32)
-    title.text_frame.paragraphs[0].font.color.rgb = COLORES['blanco']
-    title.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
+    # Título centrado horizontalmente
+    title = slide.shapes.add_textbox(
+        0,
+        Inches(0.2),
+        Inches(10),
+        Inches(0.6)
+    )
+    tf = title.text_frame
+    tf.text = f"Datos de Cobertura - {tipo_medio}"
+    p = tf.paragraphs[0]
+    p.font.name = FUENTES['titulo']
+    p.font.size = Pt(28)
+    p.font.color.rgb = COLORES['blanco']
+    p.alignment = PP_ALIGN.CENTER
     
     # Caja de resumen
     summary_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(1), Inches(1.5), Inches(8), Inches(1.8))
@@ -246,7 +277,7 @@ def crear_graficos(pr, datos):
         return
     
     for url in urls:
-        slide = pr.slides.add_slide(pr.slide_layouts[6])
+        slide = pr.slides.add_slide(pr.slide_layouts[5])  # Usando layout en blanco
         aplicar_estilo_slide(slide)
         
         # Determinar tipo de gráfico y título
@@ -263,50 +294,90 @@ def crear_graficos(pr, datos):
             medio = url.split("top10_vpe_")[1].split(".")[0].replace("_", " ").title()
             tipo_grafico = f"Top 10 VPE - {medio}"
         
-        # Barra de título
-        title_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0), Inches(0.5), Inches(10), Inches(0.8))
+        # Barra de título horizontal
+        title_box = slide.shapes.add_shape(
+            MSO_SHAPE.RECTANGLE,
+            Inches(0),
+            0,
+            Inches(10),
+            Inches(1)
+        )
         title_box.fill.solid()
         title_box.fill.fore_color.rgb = COLORES['principal']
         title_box.line.fill.background()
         
-        # Título
-        title = slide.shapes.add_textbox(Inches(0), Inches(0.6), Inches(10), Inches(0.6))
+        # Título centrado horizontalmente
+        title = slide.shapes.add_textbox(
+            Inches(0),
+            Inches(0.2),
+            Inches(10),
+            Inches(0.6)
+        )
         tf = title.text_frame
         tf.text = tipo_grafico
-        tf.paragraphs[0].font.name = FUENTES['titulo']
-        tf.paragraphs[0].font.size = Pt(32)
-        tf.paragraphs[0].font.color.rgb = COLORES['blanco']
-        tf.paragraphs[0].alignment = PP_ALIGN.CENTER
+        p = tf.paragraphs[0]
+        p.font.name = FUENTES['titulo']
+        p.font.size = Pt(28)
+        p.font.color.rgb = COLORES['blanco']
+        p.alignment = PP_ALIGN.CENTER
         
-        # Marco para el gráfico
-        chart_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0.5), Inches(1.5), Inches(9), Inches(5))
+        # Marco para el gráfico con sombra
+        chart_box = slide.shapes.add_shape(
+            MSO_SHAPE.RECTANGLE,
+            Inches(0.5),
+            Inches(1.5),
+            Inches(9),
+            Inches(5)
+        )
         chart_box.fill.solid()
         chart_box.fill.fore_color.rgb = COLORES['blanco']
         chart_box.line.color.rgb = COLORES['gris_claro']
+        chart_box.shadow.inherit = False
         
-        # Descargar e insertar gráfico
+        # Descargar e insertar gráfico con mejor manejo de errores
         img_path = download_image(url)
-        if img_path:
+        if img_path and os.path.exists(img_path):
             try:
-                # Ajustar márgenes para el gráfico
+                # Calcular dimensiones para mantener proporción
+                img = Image.open(img_path)
+                img_width, img_height = img.size
+                aspect_ratio = img_width / img_height
+                
+                # Ajustar dimensiones manteniendo proporción
+                target_width = Inches(8)
+                target_height = target_width / aspect_ratio
+                
+                # Centrar el gráfico
                 left = Inches(1)
                 top = Inches(1.8)
-                width = Inches(8)
-                height = Inches(4.4)
-                slide.shapes.add_picture(img_path, left, top, width=width, height=height)
+                
+                # Insertar imagen con las dimensiones calculadas
+                pic = slide.shapes.add_picture(
+                    img_path,
+                    left,
+                    top,
+                    width=target_width,
+                    height=min(target_height, Inches(4.5))  # Limitar altura máxima
+                )
+                
             except Exception as e:
                 logging.error(f"Error al procesar gráfico {url}: {e}")
-                error_box = slide.shapes.add_textbox(Inches(2), Inches(3), Inches(6), Inches(1))
+                error_box = slide.shapes.add_textbox(
+                    Inches(2),
+                    Inches(3),
+                    Inches(6),
+                    Inches(1)
+                )
                 tf = error_box.text_frame
                 tf.text = "Error al cargar el gráfico"
                 tf.paragraphs[0].font.color.rgb = COLORES['acento']
                 tf.paragraphs[0].font.size = Pt(14)
+                tf.paragraphs[0].alignment = PP_ALIGN.CENTER
             finally:
-                if os.path.exists(img_path):
-                    try:
-                        os.remove(img_path)
-                    except OSError as e:
-                        logging.error(f"Error al eliminar imagen temporal {img_path}: {e}")
+                try:
+                    os.remove(img_path)
+                except OSError as e:
+                    logging.error(f"Error al eliminar imagen temporal {img_path}: {e}")
         
         add_footer(slide, f"{tipo_grafico} - Informe de Medios")
 

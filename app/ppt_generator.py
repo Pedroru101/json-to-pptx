@@ -8,400 +8,376 @@ import os
 import logging
 from app.utils import download_image
 
-# Configurar logging para ver los errores en la consola (y en los logs de Render)
+# Configuración de logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# --- CONFIGURACIÓN DE ESTILOS Y TEMAS (SIMPLIFICADO) ---
-# Colores (ejemplos, puedes cambiarlos a los de tu marca)
-# CORRECCIÓN AQUÍ: Pasar R, G, B como argumentos separados
-COLOR_PRINCIPAL = RGBColor(0x00, 0x56, 0x91) # Un azul corporativo (0x005691)
-COLOR_SECUNDARIO = RGBColor(0xEE, 0xEE, 0xEE) # Un gris claro para fondos o texto sutil (0xEEEEEE)
-COLOR_TEXTO_OSCURO = RGBColor(0x33, 0x33, 0x33) # Gris oscuro para texto principal (0x333333)
+# Configuración de estilos
+COLOR_PRINCIPAL = RGBColor(0x00, 0x56, 0x91)
+COLOR_SECUNDARIO = RGBColor(0xEE, 0xEE, 0xEE)
+COLOR_TEXTO_OSCURO = RGBColor(0x33, 0x33, 0x33)
+COLOR_ACENTO = RGBColor(0x00, 0x8A, 0xD7)
 
-# Fuentes (asegúrate de que estén disponibles en el entorno de Render o usa fuentes comunes)
-FUENTE_TITULO = 'Arial' # O 'Calibri Light', 'Roboto', etc.
-FUENTE_CUERPO = 'Arial' # O 'Calibri', 'Open Sans', etc.
+FUENTE_TITULO = 'Arial'
+FUENTE_CUERPO = 'Arial'
 
-# --- FUNCIÓN PRINCIPAL ---
-def generar_pptx(data, filename):
-    pr = Presentation()
+def add_footer(slide, text_content):
+    footer = slide.shapes.add_textbox(Inches(0.5), Inches(6.9), Inches(9), Inches(0.3))
+    tf = footer.text_frame
+    tf.text = text_content
+    p = tf.paragraphs[0]
+    p.font.size = Pt(10)
+    p.font.name = FUENTE_CUERPO
+    p.font.color.rgb = COLOR_TEXTO_OSCURO
 
-    # --- INICIO DE LAS VALIDACIONES DE ENTRADA ---
-    datos = None
-    imagenes = []
-
-    # Permitir tanto lista como objeto como entrada
-    if isinstance(data, list):
-        if not data:
-            logging.error("Input data list is empty.")
-            raise ValueError("Input data list is empty.")
-        datos = data[0] if isinstance(data[0], dict) else None
-        # Extraer imágenes del resto de la lista
-        for d in data[1:]:
-            if isinstance(d, dict) and "url" in d:
-                imagenes.append(d["url"])
-            elif isinstance(d, str) and d.startswith("http"):
-                imagenes.append(d)
-            else:
-                logging.warning(f"Elemento de imagen con formato incorrecto: {d}")
-    elif isinstance(data, dict):
-        datos = data
-        # Buscar claves que puedan contener urls de imagen
-        posibles_claves = ["imagenes", "images", "urls", "graficos", "charts"]
-        for clave in posibles_claves:
-            if clave in data and isinstance(data[clave], list):
-                for img in data[clave]:
-                    if isinstance(img, str) and img.startswith("http"):
-                        imagenes.append(img)
-                    elif isinstance(img, dict) and "url" in img and img["url"].startswith("http"):
-                        imagenes.append(img["url"])
-        # Buscar claves individuales que sean urls
-        for v in data.values():
-            if isinstance(v, str) and v.startswith("http"):
-                imagenes.append(v)
-    else:
-        logging.error("Input data must be a list or a dict.")
-        raise ValueError("Input data must be a list or a dict.")
-
-    if not datos or not isinstance(datos, dict):
-        logging.error("No se pudo extraer el objeto de datos principal.")
-        raise ValueError("No se pudo extraer el objeto de datos principal.")
-    # --- FIN DE LAS VALIDACIONES DE ENTRADA ---
-
-    # --- DISEÑO PROFESIONAL DEL PPT ---
-    # Fondo degradado azul-gris para todas las slides
-    SLIDE_BG_COLOR_1 = RGBColor(0x00, 0x56, 0x91)  # Azul corporativo
-    SLIDE_BG_COLOR_2 = RGBColor(0xEE, 0xEE, 0xEE)  # Gris claro
-    SLIDE_BG_COLOR_3 = RGBColor(0xF4, 0xF8, 0xFB)  # Azul muy claro
-
-    def set_slide_background(slide, color=SLIDE_BG_COLOR_3):
-        fill = slide.background.fill
-        fill.solid()
-        fill.fore_color.rgb = color
-
-    # --- SLIDE RESUMEN GLOBAL ---
-    slide_layout_title_only = pr.slide_layouts[5]
-    slide = pr.slides.add_slide(slide_layout_title_only)
-    set_slide_background(slide, SLIDE_BG_COLOR_3)
-
+def crear_portada(pr, datos):
+    slide = pr.slides.add_slide(pr.slide_layouts[0])
     title = slide.shapes.title
+    subtitle = slide.placeholders[1]
+    
     title.text = "Informe de Medios"
-    title.text_frame.paragraphs[0].font.name = FUENTE_TITULO
-    title.text_frame.paragraphs[0].font.size = Pt(36)
-    title.text_frame.paragraphs[0].font.color.rgb = COLOR_PRINCIPAL
-    title.text_frame.auto_size = MSO_AUTO_SIZE.SHAPE_TO_FIT_TEXT
+    subtitle.text = f"Período: {datos.get('fechaInicial', 'N/A')} - {datos.get('fechaFinal', 'N/A')}"
+    
+    for shape in [title, subtitle]:
+        shape.text_frame.paragraphs[0].font.name = FUENTE_TITULO
+        shape.text_frame.paragraphs[0].font.color.rgb = COLOR_PRINCIPAL
+    
+    title.text_frame.paragraphs[0].font.size = Pt(44)
+    subtitle.text_frame.paragraphs[0].font.size = Pt(24)
+    
+    add_footer(slide, "Portada - Informe de Medios")
 
-    # Caja con borde y fondo para datos resumen
+def crear_metodologia(pr):
+    slide = pr.slides.add_slide(pr.slide_layouts[1])
+    title = slide.shapes.title
+    content = slide.placeholders[1]
+    
+    title.text = "Metodología"
+    title.text_frame.paragraphs[0].font.name = FUENTE_TITULO
+    title.text_frame.paragraphs[0].font.color.rgb = COLOR_PRINCIPAL
+    
+    metodologia_text = [
+        "• Monitoreo continuo de medios",
+        "• Análisis cualitativo y cuantitativo",
+        "• Métricas de evaluación:",
+        "   - Valor Publicitario Equivalente (VPE)",
+        "   - Alcance y audiencia",
+        "   - Sentimiento y tono",
+        "   - Presencia en diferentes soportes"
+    ]
+    
+    content.text = "\n".join(metodologia_text)
+    for p in content.text_frame.paragraphs:
+        p.font.name = FUENTE_CUERPO
+        p.font.size = Pt(18)
+    
+    add_footer(slide, "Metodología - Informe de Medios")
+
+def crear_datos_cobertura(pr, datos, tipo_medio):
+    slide = pr.slides.add_slide(pr.slide_layouts[2])
+    title = slide.shapes.title
+    
+    title.text = f"Datos de Cobertura - {tipo_medio}"
+    title.text_frame.paragraphs[0].font.name = FUENTE_TITULO
+    title.text_frame.paragraphs[0].font.color.rgb = COLOR_PRINCIPAL
+    
+    medio_data = datos.get(f"{tipo_medio}_raw", {})
+    if not medio_data:
+        return
+    
+    # Crear caja de datos principales
+    left = Inches(0.8)
+    top = Inches(1.5)
+    width = Inches(8.2)
+    height = Inches(1.5)
+    
+    txBox = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, left, top, width, height)
+    txBox.fill.solid()
+    txBox.fill.fore_color.rgb = COLOR_SECUNDARIO
+    txBox.line.color.rgb = COLOR_PRINCIPAL
+    
+    tf = txBox.text_frame
+    tf.word_wrap = True
+    
+    # Añadir datos específicos del medio con formato mejorado
+    p = tf.add_paragraph()
+    p.text = f"📊 Resumen de Impacto en {tipo_medio}"
+    p.font.size = Pt(18)
+    p.font.bold = True
+    p.font.name = FUENTE_CUERPO
+    
+    p = tf.add_paragraph()
+    p.text = f"Total de Noticias: {medio_data.get('cantidad_noticias', 'N/A')} | Alcance: {medio_data.get('total_audiencia', 'N/A')}"
+    p.font.size = Pt(14)
+    p.font.name = FUENTE_CUERPO
+    
+    p = tf.add_paragraph()
+    p.text = f"VPE: {medio_data.get('total_vpe', 'N/A')} | Valor Cualitativo: {medio_data.get('total_vc', 'N/A')}"
+    p.font.size = Pt(14)
+    p.font.name = FUENTE_CUERPO
+    
+    # Lista de noticias
+    noticias_list = medio_data.get("noticias", [])
+    if noticias_list:
+        # Crear caja para noticias
+        left = Inches(0.8)
+        top = Inches(3.2)
+        width = Inches(8.2)
+        height = Inches(3.5)
+        
+        newsBox = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, left, top, width, height)
+        newsBox.fill.solid()
+        newsBox.fill.fore_color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+        newsBox.line.color.rgb = COLOR_PRINCIPAL
+        
+        tf = newsBox.text_frame
+        tf.word_wrap = True
+        
+        p = tf.add_paragraph()
+        p.text = "📰 Noticias Destacadas"
+        p.font.size = Pt(16)
+        p.font.bold = True
+        p.font.name = FUENTE_CUERPO
+        
+        items_per_slide = 6
+        current_items = 0
+        
+        for noticia in noticias_list:
+            if current_items >= items_per_slide:
+                # Crear nueva diapositiva para más noticias
+                slide = pr.slides.add_slide(pr.slide_layouts[2])
+                title = slide.shapes.title
+                title.text = f"Datos de Cobertura - {tipo_medio} (Continuación)"
+                title.text_frame.paragraphs[0].font.name = FUENTE_TITULO
+                title.text_frame.paragraphs[0].font.color.rgb = COLOR_PRINCIPAL
+                
+                newsBox = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, left, Inches(1.5), width, height)
+                newsBox.fill.solid()
+                newsBox.fill.fore_color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+                newsBox.line.color.rgb = COLOR_PRINCIPAL
+                
+                tf = newsBox.text_frame
+                tf.word_wrap = True
+                current_items = 0
+            
+            p = tf.add_paragraph()
+            p.text = f"📅 {noticia.get('fecha', 'N/A')} - {noticia.get('titulo', 'N/A')}"
+            p.font.size = Pt(12)
+            p.font.name = FUENTE_CUERPO
+            
+            p = tf.add_paragraph()
+            p.text = f"    {noticia.get('titular', 'N/A')}"
+            p.font.size = Pt(11)
+            p.font.name = FUENTE_CUERPO
+            p.font.italic = True
+            
+            current_items += 1
+    
+    add_footer(slide, f"Cobertura {tipo_medio} - Informe de Medios")
+
+def crear_vpe_totales(pr, datos):
+    slide = pr.slides.add_slide(pr.slide_layouts[2])
+    title = slide.shapes.title
+    
+    title.text = "Valor Publicitario Equivalente (VPE) Total"
+    title.text_frame.paragraphs[0].font.name = FUENTE_TITULO
+    title.text_frame.paragraphs[0].font.color.rgb = COLOR_PRINCIPAL
+    
     left = Inches(0.8)
     top = Inches(1.8)
     width = Inches(8.2)
-    height = Inches(2.2)
+    height = Inches(4)
+    
     txBox = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, left, top, width, height)
     txBox.fill.solid()
-    txBox.fill.fore_color.rgb = SLIDE_BG_COLOR_2
-    txBox.line.color.rgb = COLOR_PRINCIPAL
-    txBox.shadow.inherit = False
+    txBox.fill.fore_color.rgb = COLOR_SECUNDARIO
+    
+    tf = txBox.text_frame
+    p = tf.add_paragraph()
+    p.text = f"VPE Total: {datos.get('totalGlobalVPE', 'N/A')}"
+    p.font.size = Pt(20)
+    p.font.name = FUENTE_CUERPO
+    
+    add_footer(slide, "VPE Total - Informe de Medios")
+
+def crear_analisis_rrss(pr, datos):
+    slide = pr.slides.add_slide(pr.slide_layouts[2])
+    title = slide.shapes.title
+    
+    title.text = "Análisis de Redes Sociales"
+    title.text_frame.paragraphs[0].font.name = FUENTE_TITULO
+    title.text_frame.paragraphs[0].font.color.rgb = COLOR_PRINCIPAL
+    
+    # Aquí se añadirían los datos específicos de RRSS cuando estén disponibles
+    rrss_data = datos.get('RRSS_raw', {})
+    if not rrss_data:
+        return
+    
+    add_footer(slide, "Análisis RRSS - Informe de Medios")
+
+def crear_analisis_offline(pr, datos):
+    slide = pr.slides.add_slide(pr.slide_layouts[2])
+    title = slide.shapes.title
+    
+    title.text = "Análisis de Elementos Offline"
+    title.text_frame.paragraphs[0].font.name = FUENTE_TITULO
+    title.text_frame.paragraphs[0].font.color.rgb = COLOR_PRINCIPAL
+    
+    # Aquí se añadirían los datos específicos de elementos offline
+    offline_data = datos.get('Offline_raw', {})
+    if not offline_data:
+        return
+    
+    add_footer(slide, "Análisis Offline - Informe de Medios")
+
+def crear_otros_elementos(pr, datos):
+    slide = pr.slides.add_slide(pr.slide_layouts[2])
+    title = slide.shapes.title
+    
+    title.text = "Análisis de Otros Elementos"
+    title.text_frame.paragraphs[0].font.name = FUENTE_TITULO
+    title.text_frame.paragraphs[0].font.color.rgb = COLOR_PRINCIPAL
+    
+    # Aquí se añadirían los datos de web, anuncios, etc.
+    otros_data = datos.get('Otros_raw', {})
+    if not otros_data:
+        return
+    
+    add_footer(slide, "Otros Elementos - Informe de Medios")
+
+def crear_tabla_sumatoria(pr, datos):
+    slide = pr.slides.add_slide(pr.slide_layouts[2])
+    title = slide.shapes.title
+    
+    title.text = "Resumen Final - VPE y Audiencias"
+    title.text_frame.paragraphs[0].font.name = FUENTE_TITULO
+    title.text_frame.paragraphs[0].font.color.rgb = COLOR_PRINCIPAL
+    
+    left = Inches(0.8)
+    top = Inches(1.8)
+    width = Inches(8.2)
+    height = Inches(4)
+    
+    txBox = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, left, top, width, height)
+    txBox.fill.solid()
+    txBox.fill.fore_color.rgb = COLOR_SECUNDARIO
+    
     tf = txBox.text_frame
     tf.clear()
-    tf.auto_size = MSO_AUTO_SIZE.SHAPE_TO_FIT_TEXT
-    tf.word_wrap = True
-
+    
     p = tf.add_paragraph()
-    p.text = f"🗓️ Período: {datos.get('fechaInicial', 'N/A')} al {datos.get('fechaFinal', 'N/A')}"
-    p.font.name = FUENTE_CUERPO
-    p.font.size = Pt(18)
-    p.font.color.rgb = COLOR_TEXTO_OSCURO
-
+    p.text = "Resumen Global"
+    p.font.size = Pt(20)
+    p.font.bold = True
+    
     p = tf.add_paragraph()
-    p.text = f"📰 Noticias totales: {datos.get('totalGlobalNoticias', 'N/A')}"
-    p.font.name = FUENTE_CUERPO
-    p.font.size = Pt(18)
-    p.font.color.rgb = COLOR_TEXTO_OSCURO
-
+    p.text = f"Total Noticias: {datos.get('totalGlobalNoticias', 'N/A')}"
+    p.font.size = Pt(16)
+    
     p = tf.add_paragraph()
-    p.text = f"👥 Audiencia total: {datos.get('totalGlobalAudiencia', 'N/A')}"
-    p.font.name = FUENTE_CUERPO
-    p.font.size = Pt(18)
-    p.font.color.rgb = COLOR_TEXTO_OSCURO
-
+    p.text = f"Audiencia Total: {datos.get('totalGlobalAudiencia', 'N/A')}"
+    p.font.size = Pt(16)
+    
     p = tf.add_paragraph()
-    p.text = f"💸 VPE Total: {datos.get('totalGlobalVPE', 'N/A')} | VC Total: {datos.get('totalGlobalVC', 'N/A')}"
-    p.font.name = FUENTE_CUERPO
-    p.font.size = Pt(18)
-    p.font.color.rgb = COLOR_TEXTO_OSCURO
+    p.text = f"VPE Total: {datos.get('totalGlobalVPE', 'N/A')}"
+    p.font.size = Pt(16)
+    
+    add_footer(slide, "Resumen Final - Informe de Medios")
 
-    add_footer(slide, "Informe Generado Automáticamente")
-
-    # --- SLIDES POR MEDIO ---
-    for medio_nombre in ["TV", "Radio", "Prensa", "Medios Digitales"]:
-        medio_data = datos.get(medio_nombre + "_raw")
-        if not medio_data:
-            logging.info(f"No hay datos para el medio: {medio_nombre}. Saltando diapositiva.")
-            continue
-        slide = pr.slides.add_slide(slide_layout_title_only)
-        set_slide_background(slide, SLIDE_BG_COLOR_1 if medio_nombre=="TV" else SLIDE_BG_COLOR_2)
-        slide.shapes.title.text = f"📊 Análisis: {medio_nombre}"
-        slide.shapes.title.text_frame.paragraphs[0].font.name = FUENTE_TITULO
-        slide.shapes.title.text_frame.paragraphs[0].font.size = Pt(32)
-        slide.shapes.title.text_frame.paragraphs[0].font.color.rgb = COLOR_PRINCIPAL
-
-        # Caja de datos
-        left = Inches(0.8)
-        top = Inches(1.6)
-        width = Inches(8.2)
-        height = Inches(2.0)
-        txBox = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, left, top, width, height)
-        txBox.fill.solid()
-        txBox.fill.fore_color.rgb = SLIDE_BG_COLOR_3
-        txBox.line.color.rgb = COLOR_PRINCIPAL
-        txBox.shadow.inherit = False
-        tf = txBox.text_frame
-        tf.clear()
-        tf.auto_size = MSO_AUTO_SIZE.SHAPE_TO_FIT_TEXT
-        tf.word_wrap = True
-
-        p = tf.add_paragraph()
-        p.text = (
-            f"📰 Noticias: {medio_data.get('cantidad_noticias', 'N/A')}\n"
-            f"👥 Audiencia: {medio_data.get('total_audiencia', 'N/A')}\n"
-            f"💸 VPE: {medio_data.get('total_vpe', 'N/A')} | VC: {medio_data.get('total_vc', 'N/A')}"
-        )
-        p.font.name = FUENTE_CUERPO
-        p.font.size = Pt(16)
-        p.font.color.rgb = COLOR_TEXTO_OSCURO
-
-        noticias_list = medio_data.get("noticias", [])
-        if noticias_list:
-            p = tf.add_paragraph()
-            p.text = "\nNoticias Destacadas:"
-            p.font.name = FUENTE_CUERPO
-            p.font.size = Pt(14)
-            p.font.bold = True
-            p.font.color.rgb = COLOR_PRINCIPAL
-            for noticia in noticias_list:
-                p = tf.add_paragraph()
-                p.text = f"- {noticia.get('fecha', 'N/A')}: {noticia.get('titulo', 'N/A')}"
-                p.font.name = FUENTE_CUERPO
-                p.font.size = Pt(12)
-                p.font.color.rgb = COLOR_TEXTO_OSCURO
-        add_footer(slide, f"{medio_nombre} - Informe de Medios")
-
-    # --- SLIDES DE GRÁFICOS ---
-    slide_layout_blank = pr.slide_layouts[6]
-    for idx, url in enumerate(imagenes):
-        slide = pr.slides.add_slide(slide_layout_blank)
-        set_slide_background(slide, SLIDE_BG_COLOR_1)
-        logging.info(f"[IMG {idx+1}/{len(imagenes)}] Intentando incrustar imagen desde: {url}")
-        img_path = download_image(url)
-        if img_path:
-            try:
-                img = Image.open(img_path)
-                width_px, height_px = img.size
-                aspect_ratio = width_px / height_px
-                slide_width = pr.slide_width
-                slide_height = pr.slide_height
-                margin_left_right_inches = Inches(0.5)
-                margin_top_bottom_inches = Inches(0.5)
-                max_width_emu = slide_width - (margin_left_right_inches * 2)
-                max_height_emu = slide_height - (margin_top_bottom_inches * 2)
-                if (max_width_emu / aspect_ratio) <= max_height_emu:
-                    scaled_width_emu = max_width_emu
-                    scaled_height_emu = scaled_width_emu / aspect_ratio
-                else:
-                    scaled_height_emu = max_height_emu
-                    scaled_width_emu = scaled_height_emu * aspect_ratio
-                left = (slide_width - scaled_width_emu) / 2
-                top = (slide_height - scaled_height_emu) / 2
-                slide.shapes.add_picture(img_path, left, top, width=scaled_width_emu, height=scaled_height_emu)
-                logging.info(f"[IMG {idx+1}] Imagen '{url}' incrustada exitosamente.")
-            except Exception as e:
-                logging.error(f"[IMG {idx+1}] Error al procesar o añadir imagen {url}: {e}")
-                # Slide de error visual con URL
-                error_box = slide.shapes.add_textbox(Inches(1), Inches(3), Inches(8), Inches(1.2))
-                tf = error_box.text_frame
-                tf.text = f"Error al procesar imagen:\n{url}"
-                tf.paragraphs[0].font.color.rgb = RGBColor(0xFF, 0x00, 0x00)
-                tf.paragraphs[0].font.size = Pt(18)
-            finally:
-                if os.path.exists(img_path):
-                    try:
-                        os.remove(img_path)
-                        logging.info(f"[IMG {idx+1}] Imagen temporal eliminada: {img_path}")
-                    except OSError as e:
-                        logging.error(f"[IMG {idx+1}] Error al eliminar la imagen temporal {img_path}: {e}")
-        else:
-            logging.warning(f"[IMG {idx+1}] No se pudo descargar la imagen de la URL: {url}")
-            # Slide de error visual con URL
-            error_box = slide.shapes.add_textbox(Inches(1), Inches(3), Inches(8), Inches(1.2))
-            tf = error_box.text_frame
-            tf.text = f"No se pudo descargar la imagen:\n{url}"
-            tf.paragraphs[0].font.color.rgb = RGBColor(0xFF, 0x00, 0x00)
-            tf.paragraphs[0].font.size = Pt(18)
-        add_footer(slide, "Gráfico de Medios")
-
-    output_path = f"/tmp/{filename}"
-    try:
-        pr.save(output_path)
-        logging.info(f"Presentación PPTX guardada en: {output_path}")
-    except Exception as e:
-        logging.error(f"Error al guardar la presentación PPTX: {e}")
-        raise
-    return output_path
-
-    # --- SLIDE RESUMEN GLOBAL ---
-    slide_layout_title_only = pr.slide_layouts[5]
-    slide = pr.slides.add_slide(slide_layout_title_only)
-
+def crear_roi(pr, datos):
+    slide = pr.slides.add_slide(pr.slide_layouts[2])
     title = slide.shapes.title
-    title.text = "Informe de Medios"
+    
+    title.text = "Análisis ROI"
     title.text_frame.paragraphs[0].font.name = FUENTE_TITULO
-    title.text_frame.paragraphs[0].font.size = Pt(36)
     title.text_frame.paragraphs[0].font.color.rgb = COLOR_PRINCIPAL
-    title.text_frame.auto_size = MSO_AUTO_SIZE.SHAPE_TO_FIT_TEXT
+    
+    # Aquí se implementaría la fórmula de ROI específica
+    roi_data = datos.get('ROI_raw', {})
+    if not roi_data:
+        return
+    
+    add_footer(slide, "Análisis ROI - Informe de Medios")
 
-    left = Inches(1.0)
-    top = Inches(2.0)
-    width = Inches(8.0)
-    height = Inches(4.0)
-    txBox = slide.shapes.add_textbox(left, top, width, height)
-    tf = txBox.text_frame
-    tf.auto_size = MSO_AUTO_SIZE.SHAPE_TO_FIT_TEXT
-    tf.word_wrap = True
-
-    p = tf.add_paragraph()
-    p.text = f"🗓️ Período: {datos.get('fechaInicial', 'N/A')} al {datos.get('fechaFinal', 'N/A')}"
-    p.font.name = FUENTE_CUERPO
-    p.font.size = Pt(18)
-    p.font.color.rgb = COLOR_TEXTO_OSCURO
-
-    p = tf.add_paragraph()
-    p.text = f"📰 Noticias totales: {datos.get('totalGlobalNoticias', 'N/A')}"
-    p.font.name = FUENTE_CUERPO
-    p.font.size = Pt(18)
-    p.font.color.rgb = COLOR_TEXTO_OSCURO
-
-    p = tf.add_paragraph()
-    p.text = f"👥 Audiencia total: {datos.get('totalGlobalAudiencia', 'N/A')}"
-    p.font.name = FUENTE_CUERPO
-    p.font.size = Pt(18)
-    p.font.color.rgb = COLOR_TEXTO_OSCURO
-
-    p = tf.add_paragraph()
-    p.text = f"💸 VPE Total: {datos.get('totalGlobalVPE', 'N/A')} | VC Total: {datos.get('totalGlobalVC', 'N/A')}"
-    p.font.name = FUENTE_CUERPO
-    p.font.size = Pt(18)
-    p.font.color.rgb = COLOR_TEXTO_OSCURO
-
-    add_footer(slide, "Informe Generado Automáticamente")
-
-
-    # --- SLIDES POR MEDIO ---
-    for medio_nombre in ["TV", "Radio", "Prensa", "Medios Digitales"]:
-        medio_data = datos.get(medio_nombre + "_raw")
-        if not medio_data:
-            logging.info(f"No hay datos para el medio: {medio_nombre}. Saltando diapositiva.")
-            continue
-
-        slide = pr.slides.add_slide(slide_layout_title_only)
-        slide.shapes.title.text = f"📊 Análisis: {medio_nombre}"
-        slide.shapes.title.text_frame.paragraphs[0].font.name = FUENTE_TITULO
-        slide.shapes.title.text_frame.paragraphs[0].font.size = Pt(32)
-        slide.shapes.title.text_frame.paragraphs[0].font.color.rgb = COLOR_PRINCIPAL
-
-        left = Inches(1.0)
-        top = Inches(1.8)
-        width = Inches(8.0)
-        height = Inches(4.5)
-        txBox = slide.shapes.add_textbox(left, top, width, height)
-        tf = txBox.text_frame
-        tf.auto_size = MSO_AUTO_SIZE.SHAPE_TO_FIT_TEXT
-        tf.word_wrap = True
-
-        p = tf.add_paragraph()
-        p.text = (
-            f"📰 Noticias: {medio_data.get('cantidad_noticias', 'N/A')}\n"
-            f"👥 Audiencia: {medio_data.get('total_audiencia', 'N/A')}\n"
-            f"💸 VPE: {medio_data.get('total_vpe', 'N/A')} | VC: {medio_data.get('total_vc', 'N/A')}"
-        )
-        p.font.name = FUENTE_CUERPO
-        p.font.size = Pt(16)
-        p.font.color.rgb = COLOR_TEXTO_OSCURO
-
-        noticias_list = medio_data.get("noticias", [])
-        if noticias_list:
-            p = tf.add_paragraph()
-            p.text = "\nNoticias Destacadas:"
-            p.font.name = FUENTE_CUERPO
-            p.font.size = Pt(14)
-            p.font.bold = True
-            p.font.color.rgb = COLOR_PRINCIPAL
-
-            for noticia in noticias_list:
-                p = tf.add_paragraph()
-                p.text = f"- {noticia.get('fecha', 'N/A')}: {noticia.get('titulo', 'N/A')}"
-                p.font.name = FUENTE_CUERPO
-                p.font.size = Pt(12)
-                p.font.color.rgb = COLOR_TEXTO_OSCURO
-
-        add_footer(slide, f"{medio_nombre} - Informe de Medios")
-
-
-    # --- SLIDES DE GRÁFICOS ---
-    slide_layout_blank = pr.slide_layouts[6]
-
-    for url in imagenes:
-        slide = pr.slides.add_slide(slide_layout_blank)
-        logging.info(f"Intentando incrustar imagen desde: {url}")
+def crear_graficos(pr, datos):
+    urls = datos.get("urls", [])
+    if not urls:
+        return
+    
+    for url in urls:
+        slide = pr.slides.add_slide(pr.slide_layouts[6])  # Blank layout
+        
+        # Determinar el tipo de gráfico basado en la URL
+        tipo_grafico = ""
+        if "vpe_barra" in url:
+            tipo_grafico = "VPE por Medio (Gráfico de Barras)"
+        elif "vpe_torta" in url:
+            tipo_grafico = "Distribución de VPE (Gráfico Circular)"
+        elif "impactos_barra" in url:
+            tipo_grafico = "Impactos por Medio (Gráfico de Barras)"
+        elif "impactos_torta" in url:
+            tipo_grafico = "Distribución de Impactos (Gráfico Circular)"
+        elif "top10" in url:
+            medio = url.split("top10_vpe_")[1].split(".")[0].replace("_", " ").title()
+            tipo_grafico = f"Top 10 VPE - {medio}"
+        
+        # Añadir título al gráfico
+        title_box = slide.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(9), Inches(0.75))
+        tf = title_box.text_frame
+        tf.text = tipo_grafico
+        tf.paragraphs[0].font.name = FUENTE_TITULO
+        tf.paragraphs[0].font.size = Pt(24)
+        tf.paragraphs[0].font.color.rgb = COLOR_PRINCIPAL
+        
+        # Descargar e insertar imagen
         img_path = download_image(url)
-
         if img_path:
             try:
-                img = Image.open(img_path)
-                width_px, height_px = img.size
-                aspect_ratio = width_px / height_px
-
-                slide_width = pr.slide_width
-                slide_height = pr.slide_height
-
-                margin_left_right_inches = Inches(0.5)
-                margin_top_bottom_inches = Inches(0.5)
-
-                max_width_emu = slide_width - (margin_left_right_inches * 2)
-                max_height_emu = slide_height - (margin_top_bottom_inches * 2)
-
-                if (max_width_emu / aspect_ratio) <= max_height_emu:
-                    scaled_width_emu = max_width_emu
-                    scaled_height_emu = scaled_width_emu / aspect_ratio
-                else:
-                    scaled_height_emu = max_height_emu
-                    scaled_width_emu = scaled_height_emu * aspect_ratio
-
-                left = (slide_width - scaled_width_emu) / 2
-                top = (slide_height - scaled_height_emu) / 2
-
-                slide.shapes.add_picture(img_path, left, top, width=scaled_width_emu, height=scaled_height_emu)
-                logging.info(f"Imagen '{url}' incrustada exitosamente.")
-
+                left = Inches(1)
+                top = Inches(1.5)
+                width = Inches(8)
+                height = Inches(5)
+                slide.shapes.add_picture(img_path, left, top, width=width, height=height)
             except Exception as e:
-                logging.error(f"Error al procesar o añadir imagen {url}: {e}")
+                logging.error(f"Error al procesar gráfico {url}: {e}")
             finally:
                 if os.path.exists(img_path):
                     try:
                         os.remove(img_path)
-                        logging.info(f"Imagen temporal eliminada: {img_path}")
                     except OSError as e:
-                        logging.error(f"Error al eliminar la imagen temporal {img_path}: {e}")
-        else:
-            logging.warning(f"Advertencia: No se pudo incrustar la imagen de la URL: {url}")
-            txBox = slide.shapes.add_textbox(Inches(1), Inches(3), Inches(8), Inches(1))
-            tf = txBox.text_frame
-            tf.text = "Error: Imagen no disponible."
-            tf.paragraphs[0].font.color.rgb = RGBColor(0xFF, 0x00, 0x00)
-            tf.paragraphs[0].font.size = Pt(24)
+                        logging.error(f"Error al eliminar imagen temporal {img_path}: {e}")
+        
+        add_footer(slide, f"{tipo_grafico} - Informe de Medios")
 
-        add_footer(slide, "Gráfico de Medios")
-
-
+def generar_pptx(data, filename):
+    pr = Presentation()
+    
+    # Validación de datos de entrada
+    if not isinstance(data, (list, dict)):
+        logging.error("Input data must be a list or dict.")
+        raise ValueError("Input data must be a list or dict.")
+    
+    datos = data[0] if isinstance(data, list) and data else data
+    if not isinstance(datos, dict):
+        logging.error("No se pudo extraer el objeto de datos principal.")
+        raise ValueError("No se pudo extraer el objeto de datos principal.")
+    
+    # Generar estructura de presentación
+    crear_portada(pr, datos)
+    crear_metodologia(pr)
+    
+    # Datos de cobertura por tipo de medio
+    for medio in ["TV", "Radio", "Prensa", "Medios Digitales"]:
+        crear_datos_cobertura(pr, datos, medio)
+    
+    crear_vpe_totales(pr, datos)
+    crear_graficos(pr, datos)  # Añadir sección de gráficos
+    crear_analisis_rrss(pr, datos)
+    crear_analisis_offline(pr, datos)
+    crear_otros_elementos(pr, datos)
+    crear_tabla_sumatoria(pr, datos)
+    crear_roi(pr, datos)
+    
+    # Guardar presentación
     output_path = f"/tmp/{filename}"
     try:
         pr.save(output_path)
@@ -409,19 +385,5 @@ def generar_pptx(data, filename):
     except Exception as e:
         logging.error(f"Error al guardar la presentación PPTX: {e}")
         raise
+    
     return output_path
-
-def add_footer(slide, text_content):
-    """Añade un pie de página simple a la diapositiva."""
-    left = Inches(0.5)
-    top = Inches(7.0)
-    width = Inches(9.0)
-    height = Inches(0.5)
-
-    footer_shape = slide.shapes.add_textbox(left, top, width, height)
-    tf = footer_shape.text_frame
-    tf.text = text_content
-    tf.paragraphs[0].font.name = FUENTE_CUERPO
-    tf.paragraphs[0].font.size = Pt(10)
-    tf.paragraphs[0].font.color.rgb = COLOR_TEXTO_OSCURO
-    tf.paragraphs[0].alignment = 3

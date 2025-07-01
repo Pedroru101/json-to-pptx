@@ -52,7 +52,7 @@ def add_footer(slide, text_content):
 def agregar_logo(slide):
     """Agrega el logo corporativo en la esquina superior derecha de cada diapositiva."""
     # URL directa al logo de MMI
-    logo_url = "https://mmi-e.com/wp-content/uploads/2021/01/logo-mmi.png"
+    logo_url = "https://mmi-e.com/wp-content/uploads/2023/03/LogoMMI_1024x1024.png"
     
     try:
         # Ruta temporal para almacenar el logo descargado

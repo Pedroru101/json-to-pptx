@@ -50,9 +50,9 @@ def add_footer(slide, text_content):
     p.alignment = PP_ALIGN.CENTER
 
 def agregar_logo(slide):
-    """Agrega el logo corporativo en la esquina superior derecha de cada diapositiva."""
+    """Agrega el logo corporativo en la esquina superior izquierda de cada diapositiva."""
     # URL directa al logo de MMI
-    logo_url = "https://mmi-e.com/wp-content/uploads/2023/03/LogoMMI_1024x1024.png"
+    logo_url = "https://mmi-e.com/wp-content/uploads/2021/01/logo-mmi.png"
     
     try:
         # Ruta temporal para almacenar el logo descargado
@@ -85,14 +85,14 @@ def agregar_logo(slide):
         
         # Verificar que el archivo existe y tiene contenido
         if os.path.exists(logo_path) and os.path.getsize(logo_path) > 0:
-            # Posición en esquina superior derecha
-            left = Inches(8.5)
+            # Posición en esquina superior izquierda
+            left = Inches(0.3)  # Cambiado de derecha a izquierda
             top = Inches(0.2)
             width = Inches(1.2)
             
             # Añadir logo con tamaño fijo
             logo = slide.shapes.add_picture(logo_path, left, top, width=width)
-            logging.info(f"Logo añadido correctamente a la diapositiva")
+            logging.info(f"Logo añadido correctamente a la diapositiva en la esquina izquierda")
         else:
             logging.error(f"El archivo del logo no existe o está vacío: {logo_path}")
             
@@ -150,28 +150,48 @@ def crear_portada(pr, datos):
     add_footer(slide, "Informe de Medios")
 
 def crear_metodologia(pr):
-    slide = pr.slides.add_slide(pr.slide_layouts[2])
+    slide = pr.slides.add_slide(pr.slide_layouts[5])  # Usar layout en blanco
     aplicar_estilo_slide(slide)
     
-    # Título con barra de color
-    title_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0), Inches(0.5), Inches(10), Inches(0.8))
+    # Barra de título horizontal
+    title_box = slide.shapes.add_shape(
+        MSO_SHAPE.RECTANGLE,
+        0,
+        0,
+        Inches(10),
+        Inches(1)
+    )
     title_box.fill.solid()
     title_box.fill.fore_color.rgb = COLORES['principal']
     title_box.line.fill.background()
     
-    title = slide.shapes.title
-    title.top = Inches(0.6)
-    title.text = "Metodología"
-    title.text_frame.paragraphs[0].font.name = FUENTES['titulo']
-    title.text_frame.paragraphs[0].font.size = Pt(32)
-    title.text_frame.paragraphs[0].font.color.rgb = COLORES['blanco']
-    title.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
+    # Título centrado horizontalmente
+    title = slide.shapes.add_textbox(
+        0,
+        Inches(0.2),
+        Inches(10),
+        Inches(0.6)
+    )
+    tf = title.text_frame
+    tf.text = "Metodología"
+    p = tf.paragraphs[0]
+    p.font.name = FUENTES['titulo']
+    p.font.size = Pt(28)
+    p.font.color.rgb = COLORES['blanco']
+    p.alignment = PP_ALIGN.CENTER
     
     # Contenido en caja con estilo
-    content_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(1), Inches(2), Inches(8), Inches(4))
+    content_box = slide.shapes.add_shape(
+        MSO_SHAPE.RECTANGLE,
+        Inches(1),
+        Inches(2),
+        Inches(8),
+        Inches(4)
+    )
     content_box.fill.solid()
     content_box.fill.fore_color.rgb = COLORES['blanco']
     content_box.line.color.rgb = COLORES['gris_claro']
+    content_box.shadow.inherit = False
     
     tf = content_box.text_frame
     tf.word_wrap = True
@@ -195,6 +215,8 @@ def crear_metodologia(pr):
         if item.startswith("   -"):
             p.level = 1
     
+    # Añadir logo
+    agregar_logo(slide)
     add_footer(slide, "Metodología - Informe de Medios")
 
 def crear_datos_cobertura(pr, datos, tipo_medio):
